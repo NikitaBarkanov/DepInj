@@ -27,4 +27,7 @@
     <string name="confirm_password_registration">Confirm password</string>
     <string name="sign_up_registration">Sign up</string>
     <string name="auth_notification_title">Выполнен вход в аккаунт</string>
+    <string name="logout" />
+    <string name="login" />
+    <string name="register" />
 </resources>

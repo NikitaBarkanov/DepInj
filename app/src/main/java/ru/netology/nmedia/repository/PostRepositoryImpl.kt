@@ -1,8 +1,11 @@
 package ru.netology.nmedia.repository
 
 import android.accounts.NetworkErrorException
+import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +19,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import ru.netology.nmedia.Auth.AppAuth
 import ru.netology.nmedia.api.PostApiService
 import ru.netology.nmedia.dao.PostDao
+import ru.netology.nmedia.dao.PostRemoteKeyDao
+import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.AttachmentType
 import ru.netology.nmedia.dto.Media
 import ru.netology.nmedia.dto.Post
@@ -30,20 +35,28 @@ import javax.inject.Inject
 
 class PostRepositoryImpl @Inject constructor(
     private val dao: PostDao,
-    private val apiService: PostApiService
+    private val apiService: PostApiService,
+    private val postRemoteKeyDao: PostRemoteKeyDao,
+    private val appDb: AppDb
 ) : PostRepository {
 
     @Inject
     lateinit var appAuth: AppAuth
 
-    override val data = Pager(
+    @OptIn(ExperimentalPagingApi::class)
+    override val data : Flow<PagingData<Post>> = Pager(
         config = PagingConfig(pageSize = 10, enablePlaceholders = false),
         pagingSourceFactory = {
-            PostPagingSource(
-                apiService
+            dao.getPagingSource()
+        },
+        remoteMediator = PostRemoteMediator(
+            apiService = apiService,
+            postDao = dao,
+            postRemoteKeyDao = postRemoteKeyDao,
+            appDb = appDb
             )
-        }
     ).flow
+        .map { it.map(PostEntity :: toDto) }
 
     override fun switchHidden() {
         dao.getAllInvisible()
@@ -164,20 +177,6 @@ class PostRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getAll() {
-        try {
-            val response = apiService.getPosts()
-
-            if (!response.isSuccessful) {
-                throw RuntimeException(response.message())
-            }
-
-            val bodyWithPosts = response.body() ?: throw RuntimeException("body is null")
-            dao.insert(bodyWithPosts.map(PostEntity::fromDto))
-        } catch (e: IOException) {
-            throw NetworkErrorException()
-        }
-    }
 
 
     override suspend fun likeById(id: Long): Post {

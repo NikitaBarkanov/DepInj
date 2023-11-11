@@ -100,7 +100,7 @@ class PostViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = FeedModelState(refreshing = true)
             try {
-                repository.getAll()
+                repository.getNewerCount()
                 _state.value = FeedModelState()
             } catch (e: Exception) {
                 _state.value = FeedModelState(error = true)
@@ -112,7 +112,7 @@ class PostViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = FeedModelState(loading = true)
             try {
-                repository.getAll()
+                repository.getNewerCount()
                 _state.value = FeedModelState()
             } catch (e: Exception) {
                 _state.value = FeedModelState(error = true)

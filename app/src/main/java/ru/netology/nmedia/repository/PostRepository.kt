@@ -14,7 +14,6 @@ interface PostRepository {
     suspend fun removeById(id: Long)
     suspend fun likeById(id: Long): Post
     suspend fun unlikeById(id: Long): Post
-    suspend fun getAll()
     fun switchHidden()
     suspend fun saveWithAttachment(post: Post, file: File)
     suspend fun setIdAndTokenToAuth(id: String, token: String)

@@ -12,17 +12,22 @@ import androidx.core.net.toFile
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.BuildConfig
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import ru.netology.nmedia.Auth.AppAuth
 import ru.netology.nmedia.R
 import ru.netology.nmedia.activity.NewPostFragment.Companion.textArg
 import ru.netology.nmedia.adapter.OnInteractionListener
+import ru.netology.nmedia.adapter.PostLoadingStateAdapter
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
@@ -32,12 +37,11 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class FeedFragment() : Fragment() {
-
     @Inject
     lateinit var appAuth: AppAuth
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val viewModel: PostViewModel by viewModels()
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val photoLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (it.resultCode == Activity.RESULT_OK) {
@@ -51,17 +55,14 @@ class FeedFragment() : Fragment() {
                 ).show()
             }
         }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-
     ): View {
         val binding = FragmentFeedBinding.inflate(inflater, container, false)
-
         val adapter = PostsAdapter(object : OnInteractionListener {
-
             override fun onEdit(post: Post) {
                 viewModel.edit(post)
                 findNavController().navigate(
@@ -71,7 +72,6 @@ class FeedFragment() : Fragment() {
                     }
                 )
             }
-
             override fun onShowImageAsSeparate(post: Post) {
                 findNavController().navigate(
                     R.id.action_feedFragment_to_separateImageFragment,
@@ -82,42 +82,34 @@ class FeedFragment() : Fragment() {
             }
 
             override fun onLike(post: Post) {
-                if(appAuth.authStateFlow.value != null) {
-                    viewModel.likeById(post.id)
-                } else {
-                    Snackbar.make(
-                        binding.root,
-                        getString(R.string.to_authentication),
-                        Snackbar.LENGTH_LONG
-                    ).setAction(
-                        R.string.sign_in
-                    ) {
-                        findNavController().navigate(R.id.action_feedFragment_to_authFragment)
-                    }.show()
-                }
+                viewModel.likeById(post.id)
             }
-
             override fun onUnLike(post: Post) {
                 viewModel.unLikeById(post.id)
             }
-
             override fun onRemove(post: Post) {
                 viewModel.removeById(post.id)
             }
-
             override fun onShare(post: Post) {
                 val intent = Intent().apply {
                     action = Intent.ACTION_SEND
                     putExtra(Intent.EXTRA_TEXT, post.content)
                     type = "text/plain"
                 }
-
                 val shareIntent =
                     Intent.createChooser(intent, getString(R.string.chooser_share_post))
                 startActivity(shareIntent)
             }
         })
-        binding.list.adapter = adapter
+
+        binding.list.adapter = adapter.withLoadStateHeaderAndFooter(
+            header = PostLoadingStateAdapter {
+                adapter.retry()
+            },
+            footer = PostLoadingStateAdapter {
+                adapter.retry()
+            }
+        )
 
         viewModel.state.observe(viewLifecycleOwner) { state ->
             binding.progress.isVisible = state.loading || state.refreshing
@@ -136,31 +128,34 @@ class FeedFragment() : Fragment() {
             }
         }
 
-
-        lifecycleScope.launchWhenCreated {
-            adapter.loadStateFlow.collectLatest {
-                binding.swipeRefresh.isRefreshing =
-                    it.refresh is LoadState.Loading
-                        || it.append is LoadState.Loading
-                        || it.prepend is LoadState.Loading
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.data.collectLatest(adapter::submitData)
             }
         }
 
-        lifecycleScope.launchWhenCreated {
-            viewModel.data.collectLatest {
-                adapter.submitData(it)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                adapter.loadStateFlow.collectLatest { state ->
+                    binding.swipeRefresh.isRefreshing =
+                        state.refresh is LoadState.Loading
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                if (appAuth.authStateFlow.value.id != 0L && appAuth.authStateFlow.value.token != null) {
+                    adapter.refresh()
+                }
             }
         }
 
         binding.retryButton.setOnClickListener {
             viewModel.loadPosts()
         }
-
         binding.fab.setOnClickListener {
-            if (appAuth.authStateFlow.value != null) {
-                findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
-            }
-
+            findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
             Snackbar.make(
                 binding.root,
                 getString(R.string.to_authentication),
@@ -172,30 +167,29 @@ class FeedFragment() : Fragment() {
             }.show()
         }
 
-    binding.swipeRefresh.setOnRefreshListener {
-        adapter.refresh()
-    }
+        binding.swipeRefresh.setOnRefreshListener {
+            adapter.refresh()
+        }
 
-    viewModel.postsLoadError.observe(viewLifecycleOwner)
-    {
-        Toast.makeText(requireContext(), viewModel.postsLoadError.value, Toast.LENGTH_LONG)
-            .show()
-    }
+        viewModel.postsLoadError.observe(viewLifecycleOwner)
+        {
+            Toast.makeText(requireContext(), viewModel.postsLoadError.value, Toast.LENGTH_LONG)
+                .show()
+        }
 
-    viewModel.savePostError.observe(viewLifecycleOwner)
-    {
-        Toast.makeText(requireContext(), viewModel.savePostError.value, Toast.LENGTH_LONG)
-            .show()
-    }
+        viewModel.savePostError.observe(viewLifecycleOwner)
+        {
+            Toast.makeText(requireContext(), viewModel.savePostError.value, Toast.LENGTH_LONG)
+                .show()
+        }
 
-
-    binding.toNewPostsButton.isVisible = false
-
-    binding.toNewPostsButton.setOnClickListener {
         binding.toNewPostsButton.isVisible = false
-        viewModel.changeHiddenStatus()
-    }
 
-    return binding.root
-}
+        binding.toNewPostsButton.setOnClickListener {
+            binding.toNewPostsButton.isVisible = false
+            viewModel.changeHiddenStatus()
+        }
+
+        return binding.root
+    }
 }

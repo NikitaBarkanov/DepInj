@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.Auth.AppAuth
+import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
@@ -49,47 +50,49 @@ class PostViewModel @Inject constructor(
     val state: LiveData<FeedModelState>
         get() = _state
 
-    val data: Flow<PagingData<Post>> = appAuth.authStateFlow.flatMapLatest {
-        (_myId, _) ->
-            repository.data.map {
-                posts ->
-                    posts.map {  it.copy(ownedByMe = it.authorId == _myId) }
+    val data: Flow<PagingData<FeedItem>> = appAuth.authStateFlow.flatMapLatest { (_myId, _) ->
+        repository.data.map { posts ->
+            posts.map { post ->
+                if (post is Post) {
+                    post.copy(ownedByMe = post.authorId == _myId)
+                } else {
+                    post
+                }
             }
-    }.flowOn(Dispatchers.Default)
+        }
+        }.flowOn(Dispatchers.Default)
 
-    private val edited = MutableLiveData(empty)
+        private val edited = MutableLiveData(empty)
 
-    private val _postCreated = SingleLiveEvent<Unit>()
-    val postCreated: LiveData<Unit>
+        private val _postCreated = SingleLiveEvent<Unit>()
+        val postCreated: LiveData<Unit>
         get() = _postCreated
 
-    private val _postEdited = SingleLiveEvent<Unit>()
-    val postEdited: LiveData<Unit>
+        private val _postEdited = SingleLiveEvent<Unit>()
+        val postEdited: LiveData<Unit>
         get() = _postEdited
 
-    private val _postsLoadError = SingleLiveEvent<String>()
-    val postsLoadError: LiveData<String>
+        private val _postsLoadError = SingleLiveEvent<String>()
+        val postsLoadError: LiveData<String>
         get() = _postsLoadError
 
-    private val _savePostError = SingleLiveEvent<String>()
-    val savePostError: LiveData<String>
+        private val _savePostError = SingleLiveEvent<String>()
+        val savePostError: LiveData<String>
         get() = _savePostError
 
 
-    private val _photo = MutableLiveData<PhotoModel?>()
-    val photo: LiveData<PhotoModel?>
+        private val _photo = MutableLiveData<PhotoModel?>()
+        val photo: LiveData<PhotoModel?>
         get() = _photo
 
 
-    fun setPhoto(photoModel: PhotoModel) {
-        _photo.value = photoModel
-    }
+        fun setPhoto(photoModel: PhotoModel) {
+            _photo.value = photoModel
+        }
 
-    fun clearPhoto() {
-        _photo.value = null
-    }
-
-
+        fun clearPhoto() {
+            _photo.value = null
+        }
 
 
     init {

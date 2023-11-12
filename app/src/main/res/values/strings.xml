@@ -30,4 +30,5 @@
     <string name="logout" />
     <string name="login" />
     <string name="register" />
+    <string name="retry" />
 </resources>

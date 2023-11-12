@@ -93,7 +93,8 @@ class PostViewHolder(
             }
 
             like.setOnClickListener {
-                if(!post.likedByMe) onInteractionListener.onLike(post) else onInteractionListener.onUnLike(post)
+                if(!post.likedByMe) onInteractionListener.onLike(post)
+                else onInteractionListener.onUnLike(post)
             }
 
             share.setOnClickListener {

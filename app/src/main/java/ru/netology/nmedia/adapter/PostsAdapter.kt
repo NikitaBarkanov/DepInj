@@ -93,7 +93,7 @@ class PostViewHolder(
             Log.d("url: ", url)
             Log.d("attachmentUrl: ", attachmentUrl)
 
-            binding.attachmentImage.loadAttachmentImage(attachmentUrl)
+            binding.attachmentImage.loadAttachmentImage(attachmentUrl, binding.root.context)
 
             attachmentImage.setOnClickListener {
                 onInteractionListener.onShowImageAsSeparate(post)

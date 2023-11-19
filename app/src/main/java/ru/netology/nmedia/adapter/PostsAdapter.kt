@@ -138,7 +138,7 @@ class AddViewHolder(
     private val binding: CardAddBinding
 ) : RecyclerView.ViewHolder(binding.root) {
     fun bind(ad: Add) {
-        binding.advertismentImage.load("${"http://10.0.2.2:9999/"}media/${ad.image}")
+        binding.advertismentImage.loadAttachmentImage("${"http://10.0.2.2:9999/"}media/${ad.image}", binding.root.context)
     }
 }
 

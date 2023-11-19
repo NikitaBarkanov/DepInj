@@ -28,7 +28,7 @@ class SeparateImageFragment : Fragment() {
             false
         )
 
-        arguments?.textArg?.let(binding.preview::loadAttachmentImage)
+        arguments?.textArg?.let { binding.preview.loadAttachmentImage(it,binding.root.context) }
 
         binding.backToPostImage.setOnClickListener {
             findNavController().navigate(R.id.action_separateImageFragment_to_feedFragment)

@@ -37,7 +37,10 @@ class PostRemoteMediator(
                     }
                 }
 
-                LoadType.PREPEND -> return MediatorResult.Success(true)
+                LoadType.PREPEND -> {
+                    val id = postRemoteKeyDao.max() ?: return MediatorResult.Success(false)
+                    apiService.getAfter(id, state.config.pageSize)
+                }
 
                 LoadType.APPEND -> {
                     val id = postRemoteKeyDao.min() ?: return MediatorResult.Success(false)
@@ -84,11 +87,20 @@ class PostRemoteMediator(
                         }
                     }
 
+                    LoadType.PREPEND -> {
+                        val keyAfter = PostRemoteKeyEntity( //Создаём ключ
+                            PostRemoteKeyEntity.KeyType.AFTER,
+                            body.first().id
+                        )
+                        postRemoteKeyDao.insert(keyAfter) //Добавляем его в базу данных
+                    }
+
                     LoadType.APPEND -> {
-                        PostRemoteKeyEntity(
+                       val keyBefore = PostRemoteKeyEntity(
                             PostRemoteKeyEntity.KeyType.BEFORE,
                             body.last().id
                         )
+                        postRemoteKeyDao.insert(keyBefore)
                     }
 
                     else -> Unit
